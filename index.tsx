@@ -1,3 +1,2 @@
-// This file is handled by the entry script in index.html
-// to ensure proper loading of the App component.
+// Consolidating to index.html to resolve GitHub Pages MIME type errors.
 export {}

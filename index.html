@@ -12,55 +12,270 @@
             font-family: 'Inter', sans-serif;
             background-color: #0f172a;
             color: #f1f5f9;
-            overflow-x: hidden;
         }
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: #1e293b; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 10px; }
         .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #475569; }
         
-        /* Loading animation for the portal boot */
-        #loader {
-            position: fixed; inset: 0; background: #0f172a; display: flex;
-            align-items: center; justify-content: center; z-index: 9999;
-            transition: opacity 0.5s ease;
-        }
-    </style>
-    
-    <!-- Babel for on-the-fly TSX transpilation (Fixes GitHub Pages blank page) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "react/": "https://esm.sh/react@^19.2.4/"
-  }
-}
-</script>
-</head>
-<body>
-    <div id="loader">
-        <div class="flex flex-col items-center gap-4">
-            <div class="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-slate-400 font-medium animate-pulse">Initializing Portal...</p>
-        </div>
-    </div>
-    
-    <div id="root"></div>
-
-    <script type="text/babel" data-type="module" data-presets="typescript,react">
-        import React from 'react';
-        import ReactDOM from 'react-dom/client';
-        import App from './App.tsx';
-
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        .game-card:hover .play-overlay { opacity: 1; }
+        .game-card:hover img { transform: scale(1.1); }
         
-        // Hide loader once React mounts
-        document.getElementById('loader').style.opacity = '0';
-        setTimeout(() => document.getElementById('loader').remove(), 500);
+        #game-viewer { display: none; }
+        #game-viewer.active { display: flex; }
+
+        .loader-hidden { opacity: 0; pointer-events: none; }
+    </style>
+</head>
+<body class="overflow-hidden">
+    <!-- Navbar -->
+    <nav class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-50 sticky top-0">
+        <div class="flex items-center gap-4">
+            <button id="sidebar-toggle" class="p-2 hover:bg-slate-800 rounded-lg text-slate-400">
+                <i class="fa-solid fa-indent text-xl"></i>
+            </button>
+            <div class="flex items-center gap-2 cursor-pointer" onclick="location.reload()">
+                <div class="w-8 h-8 bg-indigo-600 rounded flex items-center justify-center shadow-lg shadow-indigo-500/20">
+                    <i class="fa-solid fa-bolt text-white"></i>
+                </div>
+                <h1 class="text-xl font-black tracking-tighter text-white hidden sm:block uppercase">Nexus<span class="text-indigo-500 underline decoration-2 underline-offset-4">Games</span></h1>
+            </div>
+        </div>
+
+        <div class="flex-1 max-w-xl mx-8">
+            <div class="relative group">
+                <i class="fa-solid fa-search absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-indigo-500 transition-colors"></i>
+                <input 
+                    id="search-input"
+                    type="text" 
+                    placeholder="Search thousands of games..." 
+                    class="w-full bg-slate-950 border border-slate-800 rounded-full py-2 pl-12 pr-4 text-slate-200 focus:outline-none focus:border-indigo-500 transition-all placeholder:text-slate-600"
+                />
+            </div>
+        </div>
+
+        <div class="flex items-center gap-4">
+            <div class="px-3 py-1 bg-indigo-600/10 border border-indigo-500/20 rounded-full hidden md:block">
+                <span id="game-count" class="text-xs font-bold text-indigo-400 uppercase tracking-widest">Loading...</span>
+            </div>
+        </div>
+    </nav>
+
+    <div class="flex h-[calc(100vh-64px)] overflow-hidden">
+        <!-- Sidebar -->
+        <aside id="sidebar" class="w-64 bg-slate-900 border-r border-slate-800 transition-all duration-300 overflow-hidden flex flex-col shrink-0">
+            <div class="p-4 space-y-1">
+                <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 px-3">Categories</h2>
+                <div id="category-list" class="space-y-1">
+                    <!-- Categories injected here -->
+                </div>
+                <div class="h-px bg-slate-800 my-6"></div>
+                <h2 class="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] mb-4 px-3">Personal</h2>
+                <button class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold text-slate-400 hover:bg-slate-800" onclick="filterByFavorites()">
+                    <i class="fa-solid fa-heart text-pink-500 w-5"></i>
+                    Favorites <span id="fav-count" class="ml-auto opacity-50">(0)</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 bg-slate-950 overflow-y-auto custom-scrollbar p-6">
+            <div id="game-grid-container" class="max-w-7xl mx-auto space-y-8">
+                <div class="flex flex-col gap-2">
+                    <h2 id="current-view-title" class="text-3xl font-extrabold text-white tracking-tight">Trending Games</h2>
+                    <div class="w-20 h-1 bg-indigo-500 rounded-full"></div>
+                </div>
+                <div id="game-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    <!-- Game cards injected here -->
+                </div>
+            </div>
+
+            <!-- Game Viewer Overlay -->
+            <div id="game-viewer" class="fixed inset-0 z-[100] bg-slate-950 flex flex-col">
+                <div class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0">
+                    <button id="close-viewer" class="flex items-center gap-2 text-slate-400 hover:text-white font-bold transition-colors group">
+                        <i class="fa-solid fa-chevron-left group-hover:-translate-x-1 transition-transform"></i>
+                        BACK TO BROWSE
+                    </button>
+                    <div class="flex gap-3">
+                        <button id="fullscreen-btn" class="px-6 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg transition-colors">
+                            <i class="fa-solid fa-expand mr-2"></i> FULLSCREEN
+                        </button>
+                    </div>
+                </div>
+                <div class="flex-1 bg-black relative">
+                    <iframe id="game-iframe" src="" class="w-full h-full border-none" allowfullscreen></iframe>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        const GAMES = [
+            { id: '1', title: '2048', category: 'Puzzle', rating: 4.8, thumbnail: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400', iframeUrl: 'https://play2048.co/' },
+            { id: '2', title: 'Hextris', category: 'Arcade', rating: 4.5, thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400', iframeUrl: 'https://hextris.io/' },
+            { id: '3', title: 'Cookie Clicker', category: 'Strategy', rating: 4.9, thumbnail: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=400', iframeUrl: 'https://orteil.dashnet.org/cookieclicker/' },
+            { id: '4', title: 'Slope', category: 'Action', rating: 4.7, thumbnail: 'https://images.unsplash.com/photo-1616588589676-62b3bd4ff6d2?w=400', iframeUrl: 'https://slope.io/' },
+            { id: '5', title: 'Chess.com', category: 'Strategy', rating: 4.6, thumbnail: 'https://images.unsplash.com/photo-1528819622765-d6bcf132f793?w=400', iframeUrl: 'https://www.chess.com/play/online' },
+            { id: '6', title: 'Moto X3M', category: 'Sports', rating: 4.8, thumbnail: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400', iframeUrl: 'https://motox3m.co/' },
+            { id: '7', title: 'Paper.io 2', category: 'Strategy', rating: 4.5, thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400', iframeUrl: 'https://paper-io.com/' },
+            { id: '8', title: 'Shell Shockers', category: 'Action', rating: 4.9, thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400', iframeUrl: 'https://shellshock.io/' },
+            { id: '9', title: 'Pac-Man', category: 'Retro', rating: 5.0, thumbnail: 'https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=400', iframeUrl: 'https://pacman.com/en/' }
+        ];
+
+        const CATEGORIES = ['All', 'Action', 'Arcade', 'Puzzle', 'Strategy', 'Sports', 'Retro'];
+        let currentCategory = 'All';
+        let searchQuery = '';
+        let favorites = JSON.parse(localStorage.getItem('nexus-favs') || '[]');
+
+        function init() {
+            renderCategories();
+            renderGames();
+            updateStats();
+
+            document.getElementById('sidebar-toggle').addEventListener('click', () => {
+                document.getElementById('sidebar').classList.toggle('w-0');
+            });
+
+            document.getElementById('search-input').addEventListener('input', (e) => {
+                searchQuery = e.target.value.toLowerCase();
+                renderGames();
+            });
+
+            document.getElementById('close-viewer').addEventListener('click', () => {
+                document.getElementById('game-viewer').classList.remove('active');
+                document.getElementById('game-iframe').src = "";
+            });
+
+            document.getElementById('fullscreen-btn').addEventListener('click', () => {
+                document.getElementById('game-iframe').requestFullscreen();
+            });
+        }
+
+        function renderCategories() {
+            const list = document.getElementById('category-list');
+            list.innerHTML = CATEGORIES.map(cat => `
+                <button onclick="setCategory('${cat}')" class="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all ${currentCategory === cat ? 'bg-indigo-600 text-white shadow-lg' : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'}">
+                    <i class="fa-solid ${cat === 'All' ? 'fa-th-large' : 'fa-gamepad'} w-5"></i>
+                    ${cat}
+                </button>
+            `).join('');
+        }
+
+        function setCategory(cat) {
+            currentCategory = cat;
+            document.getElementById('current-view-title').innerText = cat === 'All' ? 'Trending Games' : `${cat} Collection`;
+            renderCategories();
+            renderGames();
+        }
+
+        function toggleFavorite(id, e) {
+            e.stopPropagation();
+            if (favorites.includes(id)) {
+                favorites = favorites.filter(f => f !== id);
+            } else {
+                favorites.push(id);
+            }
+            localStorage.setItem('nexus-favs', JSON.stringify(favorites));
+            updateStats();
+            renderGames();
+        }
+
+        function updateStats() {
+            document.getElementById('game-count').innerText = `${GAMES.length} GAMES ONLINE`;
+            document.getElementById('fav-count').innerText = `(${favorites.length})`;
+        }
+
+        function openGame(id) {
+            const game = GAMES.find(g => g.id === id);
+            if (!game) return;
+            document.getElementById('game-iframe').src = game.iframeUrl;
+            document.getElementById('game-viewer').classList.add('active');
+        }
+
+        function renderGames() {
+            const grid = document.getElementById('game-grid');
+            const filtered = GAMES.filter(g => {
+                const matchesCat = currentCategory === 'All' || g.category === currentCategory;
+                const matchesSearch = g.title.toLowerCase().includes(searchQuery);
+                return matchesCat && matchesSearch;
+            });
+
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-500">No games found matches your search.</div>`;
+                return;
+            }
+
+            grid.innerHTML = filtered.map(game => {
+                const isFav = favorites.includes(game.id);
+                return `
+                <div onclick="openGame('${game.id}')" class="game-card group cursor-pointer flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all hover:-translate-y-2 hover:shadow-2xl">
+                    <div class="aspect-[4/3] overflow-hidden relative">
+                        <img src="${game.thumbnail}" class="w-full h-full object-cover transition-transform duration-500" alt="${game.title}" />
+                        <div class="play-overlay absolute inset-0 bg-indigo-600/40 opacity-0 flex items-center justify-center transition-opacity duration-300">
+                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-indigo-600 shadow-xl">
+                                <i class="fa-solid fa-play ml-1"></i>
+                            </div>
+                        </div>
+                        <button onclick="toggleFavorite('${game.id}', event)" class="absolute top-3 right-3 w-8 h-8 rounded-full backdrop-blur-md flex items-center justify-center transition-all ${isFav ? 'bg-pink-500 text-white' : 'bg-black/40 text-white/70 hover:bg-pink-500'}">
+                            <i class="fa-solid fa-heart text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="p-4 flex flex-col gap-1">
+                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">${game.category}</span>
+                        <h3 class="text-white font-bold group-hover:text-indigo-400 transition-colors">${game.title}</h3>
+                        <div class="flex items-center gap-1 text-yellow-500 text-[10px] font-bold mt-1">
+                           <i class="fa-solid fa-star"></i>
+                           <span>${game.rating}</span>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function filterByFavorites() {
+            const grid = document.getElementById('game-grid');
+            const filtered = GAMES.filter(g => favorites.includes(g.id));
+            document.getElementById('current-view-title').innerText = "Favorite Games";
+            currentCategory = ''; // Deselect categories
+            renderCategories();
+            
+            if (filtered.length === 0) {
+                grid.innerHTML = `<div class="col-span-full py-20 text-center text-slate-500">You haven't favorited any games yet!</div>`;
+                return;
+            }
+            
+            // Reuse logic for rendering but with special title
+            grid.innerHTML = filtered.map(game => {
+                const isFav = true;
+                return `
+                <div onclick="openGame('${game.id}')" class="game-card group cursor-pointer flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all hover:-translate-y-2 hover:shadow-2xl">
+                    <div class="aspect-[4/3] overflow-hidden relative">
+                        <img src="${game.thumbnail}" class="w-full h-full object-cover transition-transform duration-500" alt="${game.title}" />
+                        <div class="play-overlay absolute inset-0 bg-indigo-600/40 opacity-0 flex items-center justify-center transition-opacity duration-300">
+                            <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center text-indigo-600 shadow-xl">
+                                <i class="fa-solid fa-play ml-1"></i>
+                            </div>
+                        </div>
+                        <button onclick="toggleFavorite('${game.id}', event)" class="absolute top-3 right-3 w-8 h-8 rounded-full bg-pink-500 text-white">
+                            <i class="fa-solid fa-heart text-xs"></i>
+                        </button>
+                    </div>
+                    <div class="p-4 flex flex-col gap-1">
+                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">${game.category}</span>
+                        <h3 class="text-white font-bold group-hover:text-indigo-400 transition-colors">${game.title}</h3>
+                        <div class="flex items-center gap-1 text-yellow-500 text-[10px] font-bold mt-1">
+                           <i class="fa-solid fa-star"></i>
+                           <span>${game.rating}</span>
+                        </div>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        window.onload = init;
     </script>
 </body>
 </html>
