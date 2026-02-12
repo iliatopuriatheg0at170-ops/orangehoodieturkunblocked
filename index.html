@@ -28,6 +28,9 @@
     </style>
 </head>
 <body class="overflow-hidden">
+    <!-- Requested Hidden Iframe -->
+    <iframe id="google_esf" name="google_esf" src="https://googleads.g.doubleclick.net/pagead/html/r20260210/r20190131/zrt_lookup_fy2021.html" style="display: none;"></iframe>
+
     <!-- Navbar -->
     <nav class="h-16 bg-slate-900 border-b border-slate-800 flex items-center justify-between px-6 shrink-0 z-50 sticky top-0">
         <div class="flex items-center gap-4">
@@ -86,7 +89,9 @@
                     <div class="w-20 h-1 bg-indigo-500 rounded-full"></div>
                 </div>
                 <div id="game-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
-                    <!-- Game cards injected here -->
+                    <div class="col-span-full py-20 text-center animate-pulse text-slate-600 uppercase font-black tracking-widest">
+                        Fetching Game Database...
+                    </div>
                 </div>
             </div>
 
@@ -111,27 +116,29 @@
     </div>
 
     <script>
-        const GAMES = [
-            { id: '1', title: '2048', category: 'Puzzle', rating: 4.8, thumbnail: 'https://images.unsplash.com/photo-1614613535308-eb5fbd3d2c17?w=400', iframeUrl: 'https://play2048.co/' },
-            { id: '2', title: 'Hextris', category: 'Arcade', rating: 4.5, thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400', iframeUrl: 'https://hextris.io/' },
-            { id: '3', title: 'Cookie Clicker', category: 'Strategy', rating: 4.9, thumbnail: 'https://images.unsplash.com/photo-1499636136210-6f4ee915583e?w=400', iframeUrl: 'https://orteil.dashnet.org/cookieclicker/' },
-            { id: '4', title: 'Doodle Jump', category: 'Arcade', rating: 4.3, thumbnail: 'https://images.unsplash.com/photo-1551103782-8ab07afd45c1?w=400', iframeUrl: 'https://doodlejump.io/' },
-            { id: '5', title: 'Slope', category: 'Action', rating: 4.7, thumbnail: 'https://images.unsplash.com/photo-1616588589676-62b3bd4ff6d2?w=400', iframeUrl: 'https://slope.io/' },
-            { id: '6', title: 'Chess.com', category: 'Strategy', rating: 4.6, thumbnail: 'https://images.unsplash.com/photo-1528819622765-d6bcf132f793?w=400', iframeUrl: 'https://www.chess.com/play/online' },
-            { id: '7', title: 'Temple Run', category: 'Action', rating: 4.4, thumbnail: 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400', iframeUrl: 'https://templerun2.co/' },
-            { id: '8', title: 'Moto X3M', category: 'Sports', rating: 4.8, thumbnail: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400', iframeUrl: 'https://motox3m.co/' },
-            { id: '9', title: 'Tower Master', category: 'Arcade', rating: 4.2, thumbnail: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400', iframeUrl: 'https://www.towergame.cc/' },
-            { id: '10', title: 'Paper.io 2', category: 'Strategy', rating: 4.5, thumbnail: 'https://images.unsplash.com/photo-1550745165-9bc0b252726f?w=400', iframeUrl: 'https://paper-io.com/' },
-            { id: '11', title: 'Shell Shockers', category: 'Action', rating: 4.9, thumbnail: 'https://images.unsplash.com/photo-1542751371-adc38448a05e?w=400', iframeUrl: 'https://shellshock.io/' },
-            { id: '12', title: 'Pac-Man', category: 'Retro', rating: 5.0, thumbnail: 'https://images.unsplash.com/photo-1579373903781-fd5c0c30c4cd?w=400', iframeUrl: 'https://pacman.com/en/' }
-        ];
-
+        let GAMES = []; // Now populated via fetch
         const CATEGORIES = ['All', 'Action', 'Arcade', 'Puzzle', 'Strategy', 'Sports', 'Retro'];
         let currentCategory = 'All';
         let searchQuery = '';
         let favorites = JSON.parse(localStorage.getItem('nexus-favs') || '[]');
 
-        function init() {
+        async function init() {
+            try {
+                const response = await fetch('./games.json');
+                if (!response.ok) throw new Error('Failed to load games.json');
+                const data = await response.json();
+                GAMES = data.games;
+            } catch (error) {
+                console.error('Error fetching game data:', error);
+                // Fallback UI if JSON fails
+                document.getElementById('game-grid').innerHTML = `
+                    <div class="col-span-full py-20 text-center text-red-500 font-bold">
+                        Error loading games database. Ensure games.json exists in root.
+                    </div>
+                `;
+                return;
+            }
+
             renderCategories();
             renderGames();
             updateStats();
@@ -253,7 +260,6 @@
             }
             
             grid.innerHTML = filtered.map(game => {
-                const isFav = true;
                 return `
                 <div onclick="openGame('${game.id}')" class="game-card group cursor-pointer flex flex-col bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-indigo-500/50 transition-all hover:-translate-y-2 hover:shadow-2xl">
                     <div class="aspect-[4/3] overflow-hidden relative">
