@@ -1,16 +1,3 @@
-
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import App from './App.tsx';
-
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  throw new Error("Could not find root element to mount to. Ensure your index.html has a <div id='root'></div>");
-}
-
-const root = ReactDOM.createRoot(rootElement);
-root.render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
-);
+// This file is handled by the entry script in index.html
+// to ensure proper loading of the App component.
+export {}
