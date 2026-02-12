@@ -1,5 +1,5 @@
 
-import { Game } from './types';
+import { Game } from './types.ts';
 
 export const GAMES: Game[] = [
   {
